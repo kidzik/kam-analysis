@@ -38,6 +38,9 @@ data = experiments
 # remove KAM from the data 
 KAM = data$KAM
 data$KAM = NULL
+data$Fz = NULL
+data$COPx = NULL
+data$COPy = NULL
 
 # create a data.frame from the list of features
 df = data.frame(data)
@@ -53,10 +56,30 @@ df$Subject = factor(df$Subject)
 df$TrialName = factor(df$TrialName)
 
 # build baseline models
-model = lm(KAM[train.mask,] ~ ., data = df[train.mask,-1])
-preds = predict(model, newdata = df[!train.mask,-1])
+model = lm(KAM[train.mask,] ~ ., data = df[train.mask,c(2:614)])
+preds = predict(model, newdata = df[!train.mask,c(2:614)])
 
 # check how they perform
-mean((preds - KAM[!train.mask,])**2) / mean((KAM[!train.mask,])**2)
+mean(colMeans((preds - KAM[!train.mask,])**2))
 
+# matplot(t(preds),t='l')
+# matplot(t(KAM[!train.mask,]),t='l')
+
+## Some plots
+mm = colMeans(KAM[!train.mask,])
+mm[] = 0
+
+sd.true = sqrt(diag(cov(KAM[!train.mask,])))
+sd.pred = sqrt(diag(cov(preds - KAM[!train.mask,])))
+
+plot(mm + sd.true, lwd=4, t='l', ylim=c(-max(sd.true) + min(mm),max(sd.true) + max(mm)))
+lines(mm - sd.true, lwd=4, t="l")
+
+matplot(t(preds - KAM[!train.mask,]) + mm,t='l',add=TRUE)
+
+lines(mm + sd.pred, lwd=4, t="l", col=1)
+lines(mm - sd.pred, lwd=4, t="l", col=1)
+
+#matplot(t(KAM) - mm,t='l')
+#plot(sd.pred**2 / sd.true**2)
 # realize that this is too good.

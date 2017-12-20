@@ -3,3 +3,4 @@ BiomechParam
 *.Rdata
 .R*
 .ipynb*
+.Rproj.user
