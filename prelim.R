@@ -31,6 +31,8 @@ if (!file.exists("experiments.Rdata")){
   save(experiments, file="experiments.Rdata")
 }
 
+res = c()
+
 # Load the data
 load("experiments.Rdata")
 data = experiments
@@ -41,6 +43,15 @@ data$KAM = NULL
 data$Fz = NULL
 data$COPx = NULL
 data$COPy = NULL
+data$Alignment = NULL
+data$KneeAlignment = NULL
+
+nc = 101
+data$TibiaAngle = prcomp(data$TibiaAngle)$x[,1:nc]
+data$PelvicAxialRot = prcomp(data$PelvicAxialRot)$x[,1:nc]
+data$PelvicList = prcomp(data$PelvicList)$x[,1:nc]
+data$KneeFlexion = prcomp(data$KneeFlexion)$x[,1:nc]
+data$VarusThrust = prcomp(data$VarusThrust)$x[,1:nc]
 
 # create a data.frame from the list of features
 df = data.frame(data)
@@ -56,30 +67,38 @@ df$Subject = factor(df$Subject)
 df$TrialName = factor(df$TrialName)
 
 # build baseline models
-model = lm(KAM[train.mask,] ~ ., data = df[train.mask,c(2:614)])
-preds = predict(model, newdata = df[!train.mask,c(2:614)])
+model = lm(KAM[train.mask,] ~ ., data = df[train.mask,c(2:ncol(df))])
+preds = predict(model, newdata = df[!train.mask,c(2:ncol(df))])
 
 # check how they perform
-mean(colMeans((preds - KAM[!train.mask,])**2))
+var.exp = 1 - colMeans((preds - KAM[!train.mask,])**2) / colMeans((KAM[!train.mask,])**2)
+var.exp[var.exp<0] = 0
+res = rbind(res, var.exp)
+plot(sqrt(var.exp))
 
 # matplot(t(preds),t='l')
 # matplot(t(KAM[!train.mask,]),t='l')
 
 ## Some plots
 mm = colMeans(KAM[!train.mask,])
-mm[] = 0
+#mm[] = 0
 
 sd.true = sqrt(diag(cov(KAM[!train.mask,])))
 sd.pred = sqrt(diag(cov(preds - KAM[!train.mask,])))
 
-plot(mm + sd.true, lwd=4, t='l', ylim=c(-max(sd.true) + min(mm),max(sd.true) + max(mm)))
-lines(mm - sd.true, lwd=4, t="l")
+plot(sd.true,ylim=c(0,max(sd.true)))
+lines(sd.pred)
 
-matplot(t(preds - KAM[!train.mask,]) + mm,t='l',add=TRUE)
-
-lines(mm + sd.pred, lwd=4, t="l", col=1)
-lines(mm - sd.pred, lwd=4, t="l", col=1)
-
-#matplot(t(KAM) - mm,t='l')
+# matplot(t(preds - KAM[!train.mask,]) + mm,t='l',add=TRUE)
+# lines(mm + sd.true, lwd=4, t='l', ylim=c(-max(sd.true) + min(mm),max(sd.true) + max(mm)))
+# lines(mm - sd.true, lwd=4, t="l")
+# 
+# 
+# lines(mm + sd.pred, lwd=4, t="l", col=1)
+# lines(mm - sd.pred, lwd=4, t="l", col=1)
+# 
+# matplot(t(KAM) - mm,t='l')
 #plot(sd.pred**2 / sd.true**2)
 # realize that this is too good.
+
+plot(colMeans(res))
