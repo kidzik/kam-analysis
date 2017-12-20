@@ -14,7 +14,7 @@ if (!file.exists("experiments.Rdata")){
     print(paste("Processing",file.names[i]))
     ss = strsplit(file.names[i],split = ".",fixed=TRUE)[[1]][1]
     ss = strsplit(ss,split = "_",fixed=TRUE)[[1]][2]
-    data = readMat(paste0(dr,"BiomechParam_R105.mat"))
+    data = readMat(paste0(dr,"BiomechParam_",ss,".mat"))
     
     nobs = dim(data$BiomechParamMat)[3]
     for (j in 1:nobs)
