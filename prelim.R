@@ -4,7 +4,7 @@ library("glmnet")
 # Convert matlab matrices to R data.frame
 # Create a file with converted data so that we don't need to repeat this process
 if (!file.exists("experiments.Rdata")){
-  dr = "BiomechParam/"
+  dr = "../BiomechParam/"
   file.names <- dir(dr, pattern ="mat")
   
   ## BIG LIST
@@ -32,6 +32,9 @@ if (!file.exists("experiments.Rdata")){
 }
 
 res = c()
+res
+
+dim(biglist[[1]])
 
 # Load the data
 load("experiments.Rdata")
@@ -46,26 +49,57 @@ data$COPy = NULL
 data$Alignment = NULL
 data$KneeAlignment = NULL
 
-nc = 101
+nc = 1
 data$TibiaAngle = prcomp(data$TibiaAngle)$x[,1:nc]
 data$PelvicAxialRot = prcomp(data$PelvicAxialRot)$x[,1:nc]
 data$PelvicList = prcomp(data$PelvicList)$x[,1:nc]
 data$KneeFlexion = prcomp(data$KneeFlexion)$x[,1:nc]
 data$VarusThrust = prcomp(data$VarusThrust)$x[,1:nc]
+data$TrunkSway = prcomp(data$TrunkSway)$x[,1:nc]
 
 # create a data.frame from the list of features
 df = data.frame(data)
+df$target = df$StepMaxRedux
+df$StepMaxRedux = NULL
+df$StepP1Redux = NULL
+df$StepP2Redux = NULL
+df$StepwiseBenefitP1 = NULL
+df$StepwiseBenefitP2 = NULL
+df$BinwiseBenefitP1 = NULL
+df$BinwiseBenefitP2 = NULL
+df$BinwiseP1Redux = NULL
+df$BinwiseP2Redux = NULL
+df$FPABin = NULL
+df$TrialName = NULL
 
 # split to training and testing sets
 subjects = unique(df$Subject)
 n = length(subjects)
-test.subj = subjects[sample(n)[1:floor(n*0.10)]]
+test.subj = subjects[sample(n)[1]]
 train.mask = !(df$Subject %in% test.subj)
 
 # make factors from strings
 df$Subject = factor(df$Subject)
-df$TrialName = factor(df$TrialName)
+#df$TrialName = factor(df$TrialName)
+df$Subject = NULL
 
+# Build models
+model.lm = lm(target ~ ., data = df[train.mask,])
+preds = predict(model.lm, newdata = df[!train.mask,])
+
+library(ggplot2)
+paper.theme = theme_set(theme_grey(base_size = 22)) +
+  theme(plot.title = element_text(hjust = 0.5),
+        panel.background = element_rect(fill = "white",linetype = 1,colour = "grey50",size = 1))
+
+FPA = c(df$FPA[!train.mask],df$FPA[!train.mask])
+reduction = c(df$target[!train.mask], preds)
+group = c(rep("true", sum(!train.mask)),rep("predicted", sum(!train.mask)))
+df.plot = data.frame(FPA=FPA, reduction=reduction, group=group)
+ggplot(df.plot, aes(x=FPA, y=reduction, group=group, color=group)) + paper.theme +
+  geom_point()
+
+### OLD STUFF
 # build baseline models
 model = lm(KAM[train.mask,] ~ ., data = df[train.mask,c(2:ncol(df))])
 preds = predict(model, newdata = df[!train.mask,c(2:ncol(df))])
@@ -88,6 +122,9 @@ sd.pred = sqrt(diag(cov(preds - KAM[!train.mask,])))
 
 plot(sd.true,ylim=c(0,max(sd.true)))
 lines(sd.pred)
+
+
+
 
 # matplot(t(preds - KAM[!train.mask,]) + mm,t='l',add=TRUE)
 # lines(mm + sd.true, lwd=4, t='l', ylim=c(-max(sd.true) + min(mm),max(sd.true) + max(mm)))
