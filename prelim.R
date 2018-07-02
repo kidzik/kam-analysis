@@ -75,20 +75,22 @@ df$FPABin = NULL
 df$TrialName = NULL
 
 # split to training and testing sets
-subjects = unique(df$Subject)
+subjects = sample(unique(df$Subject))
 n = length(subjects)
-test.subj = as.character(subjects[sample(n)[1]])
-test.subj = "S113"
-
-train.mask = !(as.character(df$Subject) %in% test.subj)
-
+Subject = df$Subject
 # make factors from strings
 dfSubject = factor(df$Subject)
 df$Subject = NULL
 
+for (test.subj in subjects){
+#test.subj = as.character(subjects[sample(n)[1]])
+#test.subj = "S113"
+
+train.mask = !(as.character(Subject) %in% test.subj)
+
 # Build models
-model.lm = lm(target ~ ., data = df[train.mask,])
-preds = predict(model.lm, newdata = df[!train.mask,])
+# model.lm = lm(target ~ ., data = df[train.mask,])
+# preds = predict(model.lm, newdata = df[!train.mask,])
 
 library(randomForest)
 model.rf = randomForest(target ~ ., data = df[train.mask,], ntree = 10)
@@ -104,17 +106,18 @@ FPA = c(df$FPA[!train.mask],df$FPA[!train.mask])
 reduction = c(df$target[!train.mask], preds)
 group = c(rep("true", sum(!train.mask)),rep("predicted", sum(!train.mask)))
 df.plot = data.frame(FPA=FPA, reduction=reduction, group=group)
-ggplot(df.plot, aes(x=FPA, y=reduction, group=group, color=group)) + paper.theme +
+pp = ggplot(df.plot, aes(x=FPA, y=reduction, group=group, color=group)) + paper.theme +
   ggtitle(test.subj)+
   geom_point()
-
+ggsave(paste0("plots/",test.subj,".png"),plot = pp)
+print(pp)
 
 ###
 library(dplyr)
 var_importance <- data.frame(variable=rownames(importance(model.rf)),
   importance=as.vector(importance(model.rf)))
 var_importance <- arrange(var_importance, desc(importance))
-
+}
 
 ### OLD STUFF
 # build baseline models
