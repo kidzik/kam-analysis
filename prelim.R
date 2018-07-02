@@ -14,7 +14,7 @@ if (!file.exists("experiments.Rdata")){
     print(paste("Processing",file.names[i]))
     ss = strsplit(file.names[i],split = ".",fixed=TRUE)[[1]][1]
     ss = strsplit(ss,split = "_",fixed=TRUE)[[1]][2]
-    data = readMat(paste0(dr,"BiomechParam_",ss,".mat"))
+    data = readMat(paste0(dr,"BiomechParam_",ss,"_Features.mat"))
     
     nobs = dim(data$BiomechParamMat)[3]
     for (j in 1:nobs)
@@ -31,11 +31,6 @@ if (!file.exists("experiments.Rdata")){
   save(experiments, file="experiments.Rdata")
 }
 
-res = c()
-res
-
-dim(biglist[[1]])
-
 # Load the data
 load("experiments.Rdata")
 data = experiments
@@ -49,7 +44,7 @@ data$COPy = NULL
 data$Alignment = NULL
 data$KneeAlignment = NULL
 
-nc = 1
+nc = 10
 data$TibiaAngle = prcomp(data$TibiaAngle)$x[,1:nc]
 data$PelvicAxialRot = prcomp(data$PelvicAxialRot)$x[,1:nc]
 data$PelvicList = prcomp(data$PelvicList)$x[,1:nc]
@@ -57,9 +52,16 @@ data$KneeFlexion = prcomp(data$KneeFlexion)$x[,1:nc]
 data$VarusThrust = prcomp(data$VarusThrust)$x[,1:nc]
 data$TrunkSway = prcomp(data$TrunkSway)$x[,1:nc]
 
+
+for (feature in c("StepWidth","KneeMLDist","TH.Ratio","TOpercent","HOpercent",
+                  "PeakKneeFlexion","PeakVarusThrust","PeakPelvicList",
+                  "PeakPelvicAxialRot","PeakTibiaAngle","PeakTrunkSway"
+                  )){
+  data[[feature]] = data[[feature]] - predict(lm(as.formula(paste0(feature," ~ Subject")), data = data), newdata=data)
+}
 # create a data.frame from the list of features
 df = data.frame(data)
-df$target = df$StepMaxRedux
+df$target = df$StepP1Redux
 df$StepMaxRedux = NULL
 df$StepP1Redux = NULL
 df$StepP2Redux = NULL
@@ -75,17 +77,23 @@ df$TrialName = NULL
 # split to training and testing sets
 subjects = unique(df$Subject)
 n = length(subjects)
-test.subj = subjects[sample(n)[1]]
-train.mask = !(df$Subject %in% test.subj)
+test.subj = as.character(subjects[sample(n)[1]])
+test.subj = "S113"
+
+train.mask = !(as.character(df$Subject) %in% test.subj)
 
 # make factors from strings
-df$Subject = factor(df$Subject)
-#df$TrialName = factor(df$TrialName)
+dfSubject = factor(df$Subject)
 df$Subject = NULL
 
 # Build models
 model.lm = lm(target ~ ., data = df[train.mask,])
 preds = predict(model.lm, newdata = df[!train.mask,])
+
+library(randomForest)
+model.rf = randomForest(target ~ ., data = df[train.mask,], ntree = 10)
+preds = predict(model.rf, newdata = df[!train.mask,])
+
 
 library(ggplot2)
 paper.theme = theme_set(theme_grey(base_size = 22)) +
@@ -97,7 +105,16 @@ reduction = c(df$target[!train.mask], preds)
 group = c(rep("true", sum(!train.mask)),rep("predicted", sum(!train.mask)))
 df.plot = data.frame(FPA=FPA, reduction=reduction, group=group)
 ggplot(df.plot, aes(x=FPA, y=reduction, group=group, color=group)) + paper.theme +
+  ggtitle(test.subj)+
   geom_point()
+
+
+###
+library(dplyr)
+var_importance <- data.frame(variable=rownames(importance(model.rf)),
+  importance=as.vector(importance(model.rf)))
+var_importance <- arrange(var_importance, desc(importance))
+
 
 ### OLD STUFF
 # build baseline models
